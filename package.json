@@ -73,7 +73,9 @@
         "zip"
       ],
       "icon": "resources/icon.png",
-      "category": "public.app-category.music"
+      "category": "public.app-category.music",
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false
     },
     "nsis": {
       "oneClick": false,
