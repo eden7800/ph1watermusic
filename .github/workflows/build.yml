@@ -29,11 +29,12 @@ jobs:
         env:
           YOUTUBE_DL_SKIP_DOWNLOAD: true
 
-      - name: Manual Download yt-dlp (macOS)
+      - name: Manual Download yt-dlp (macOS Universal)
         if: matrix.os == 'macos-latest'
         run: |
           mkdir -p node_modules/youtube-dl-exec/bin
-          gh release download --repo yt-dlp/yt-dlp --pattern "yt-dlp" --output "node_modules/youtube-dl-exec/bin/yt-dlp"
+          # 모든 맥에서 돌아가는 범용 바이너리 다운로드
+          curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_macos -o node_modules/youtube-dl-exec/bin/yt-dlp
           chmod +x node_modules/youtube-dl-exec/bin/yt-dlp
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -42,14 +43,14 @@ jobs:
         if: matrix.os == 'windows-latest'
         run: |
           mkdir -p node_modules/youtube-dl-exec/bin
-          gh release download --repo yt-dlp/yt-dlp --pattern "yt-dlp.exe" --output "node_modules/youtube-dl-exec/bin/yt-dlp.exe"
+          curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe -o node_modules/youtube-dl-exec/bin/yt-dlp.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build App
         run: npm run build
 
-      - name: Build for macOS
+      - name: Build for macOS (Universal)
         if: matrix.os == 'macos-latest'
         run: npx electron-builder --mac --publish never
         env:

@@ -68,10 +68,12 @@
       "icon": "resources/icon.png"
     },
     "mac": {
-      "target": [
-        "dmg",
-        "zip"
-      ],
+      "target": {
+        "target": "default",
+        "arch": [
+          "universal"
+        ]
+      },
       "icon": "resources/icon.png",
       "category": "public.app-category.music",
       "hardenedRuntime": false,
