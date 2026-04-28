@@ -24,8 +24,27 @@ jobs:
           node-version: 20
           cache: 'npm'
 
-      - name: Install Dependencies
+      - name: Install Dependencies (Skip yt-dlp download)
         run: npm install
+        env:
+          YOUTUBE_DL_SKIP_DOWNLOAD: true
+
+      - name: Manual Download yt-dlp (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          mkdir -p node_modules/youtube-dl-exec/bin
+          gh release download --repo yt-dlp/yt-dlp --pattern "yt-dlp" --output "node_modules/youtube-dl-exec/bin/yt-dlp"
+          chmod +x node_modules/youtube-dl-exec/bin/yt-dlp
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Manual Download yt-dlp (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          mkdir -p node_modules/youtube-dl-exec/bin
+          gh release download --repo yt-dlp/yt-dlp --pattern "yt-dlp.exe" --output "node_modules/youtube-dl-exec/bin/yt-dlp.exe"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build App
         run: npm run build
