@@ -1,0 +1,50 @@
+@import url('https://cdn.jsdelivr.net/gh/fonts-archive/Paperlogy/Paperlogy.css');
+
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --sanseong-bg: #030303;
+    --sanseong-sidebar-text: rgba(255, 255, 255, 0.7);
+    --sanseong-text: #ffffff;
+    --sanseong-accent: #ffffff;
+    --sanseong-player-bg: #121212;
+    --dynamic-bg: rgba(50, 50, 50, 0.5); /* Default dark gray */
+  }
+
+  body {
+    @apply bg-[var(--sanseong-bg)] text-[var(--sanseong-text)] antialiased overflow-hidden select-none;
+    font-family: "Paperlogy", -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  }
+}
+
+@layer components {
+  .sidebar-link {
+    @apply flex items-center gap-4 px-4 py-3 rounded-md text-[15px] font-medium transition-colors text-[var(--sanseong-sidebar-text)] hover:bg-white/10;
+  }
+
+  .sidebar-link-active {
+    @apply bg-white/10 text-white font-bold;
+  }
+}
+
+/* Custom Scrollbar for Dark Theme */
+::-webkit-scrollbar {
+  width: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+  border: 4px solid transparent;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.4);
+  background-clip: padding-box;
+}
