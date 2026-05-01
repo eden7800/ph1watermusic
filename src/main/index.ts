@@ -161,7 +161,7 @@ ipcMain.on('watch-folder', (event, folderPath: string) => {
     const files = readdirSync(folderPath)
     const audioFiles = files.filter(f => /\.(mp3|flac|m4a|wav|alac)$/i.test(f))
     const fullPaths = audioFiles.map(f => join(folderPath, f))
-    const tracks = await Promise.all(fullPaths.map(fullPaths.map(parseTrack)))
+    const tracks = await Promise.all(fullPaths.map(parseTrack))
     event.reply('folder-updated', tracks)
   }
 

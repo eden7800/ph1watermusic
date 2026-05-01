@@ -166,7 +166,9 @@ const MainLayout: React.FC = () => {
   }
 
   const isPlaylistUrl = (url: string) =>
-    /youtube\.com\/playlist\?/.test(url) || /youtu\.be\/playlist/.test(url)
+    /youtube\.com\/playlist\?/.test(url) ||
+    (/youtube\.com\/watch/.test(url) && /[?&]list=/.test(url)) ||
+    /youtu\.be\/.+\?.*list=/.test(url)
 
   const handleYtSearch = async (e?: React.FormEvent) => {
     if (e) e.preventDefault()

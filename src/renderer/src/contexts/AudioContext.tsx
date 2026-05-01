@@ -47,7 +47,7 @@ interface AudioContextType {
   selectAndWatchFolder: () => Promise<void>
   watchedFolder: string | null
   youtubeQueue: Track[]
-  setYoutubeQueue: (tracks: Track[]) => void
+  setYoutubeQueue: React.Dispatch<React.SetStateAction<Track[]>>
   removeTrack: (trackId: string, e?: React.MouseEvent) => void
   clearQueue: () => void
 }
@@ -171,8 +171,8 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const tracksAddedIn2026 = useMemo(() => {
     const start2026 = new Date('2026-01-01').getTime()
-    const end2026 = new Date('2026-12-31').getTime()
-    return queue.filter(t => t.addedAt && t.addedAt >= start2026 && t.addedAt <= end2026)
+    const end2026 = new Date('2027-01-01').getTime() // 2026년 12월 31일 전체 포함
+    return queue.filter(t => t.addedAt && t.addedAt >= start2026 && t.addedAt < end2026)
   }, [queue])
 
   const selectAndWatchFolder = async () => {
@@ -335,10 +335,14 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     _prepareHowl(queue[nextIdx], true)
   }
   const playPrev = () => {
-    if (currentIndex - 1 >= 0) {
+    if (currentIndex > 0) {
       setCurrentIndex(currentIndex - 1)
       _prepareHowl(queue[currentIndex - 1], true)
-    } else if (howlRef.current) seek(0)
+    } else {
+      // 첫 번째 곡이거나 재생 중이면 처음부터 다시
+      if (howlRef.current) seek(0)
+      else if (currentTrack) _prepareHowl(currentTrack, true)
+    }
   }
   const toggleRepeatMode = () => setRepeatMode(p => (p === 'off' ? 'all' : p === 'all' ? 'one' : 'off'))
   const toggleShuffle = () => {
@@ -418,7 +422,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setDuration(0)
   }
 
-  useEffect(() => { if (howlRef.current) howlRef.current.volume(volume) }, [volume, howl])
+  useEffect(() => { if (howlRef.current) howlRef.current.volume(volume) }, [volume])
 
   // Discord RPC 자동 업데이트
   useEffect(() => {
