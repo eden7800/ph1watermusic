@@ -19,7 +19,9 @@ const api = {
   // Discord RPC
   discordUpdatePresence: (info: { title: string; artist: string; isPlaying: boolean; isYouTube?: boolean }) => 
     ipcRenderer.send('discord-update-presence', info),
-  discordClearPresence: () => ipcRenderer.send('discord-clear-presence')
+  discordClearPresence: () => ipcRenderer.send('discord-clear-presence'),
+  // 커버아트 지연 로딩
+  getCover: (filePath: string) => ipcRenderer.invoke('get-cover', filePath)
 }
 
 if (process.contextIsolated) {

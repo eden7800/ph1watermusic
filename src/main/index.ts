@@ -6,6 +6,7 @@ import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import chokidar from 'chokidar'
 import { create } from 'youtube-dl-exec'
 import { Client } from '@xhayper/discord-rpc'
+import { parseFile as parseAudioFile } from 'music-metadata'
 
 const binName = process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp'
 const ytDlpPath = is.dev
@@ -83,18 +84,22 @@ app.on('window-all-closed', () => {
   }
 })
 
+// 동시 실행 수를 제한하는 배치 실행 함수 (I/O 부하 방지)
+async function batchPromises<T>(items: string[], fn: (item: string) => Promise<T>, concurrency = 4): Promise<T[]> {
+  const results: T[] = []
+  for (let i = 0; i < items.length; i += concurrency) {
+    const batch = items.slice(i, i + concurrency)
+    const batchResults = await Promise.all(batch.map(fn))
+    results.push(...batchResults)
+  }
+  return results
+}
+
 async function parseTrack(filePath: string) {
-  const { parseFile } = await import('music-metadata')
   try {
     const stats = statSync(filePath)
-    const metadata = await parseFile(filePath)
-
-    let cover = undefined
-    if (metadata.common.picture && metadata.common.picture.length > 0) {
-      const pic = metadata.common.picture[0]
-      cover = `data:${pic.format};base64,${Buffer.from(pic.data).toString('base64')}`
-    }
-
+    // skipCovers: true → 커버아트 제외하고 메타데이터만 빠르게 읽음
+    const metadata = await parseAudioFile(filePath, { skipCovers: true })
     const url = pathToFileURL(filePath).href
 
     return {
@@ -103,7 +108,7 @@ async function parseTrack(filePath: string) {
       artist: metadata.common.artist || 'Unknown Artist',
       album: metadata.common.album,
       url: url,
-      cover: cover,
+      cover: undefined, // 커버아트는 필요 시 별도 요청으로 로드
       addedAt: stats.birthtimeMs,
       format: {
         container: metadata.format.container,
@@ -119,6 +124,20 @@ async function parseTrack(filePath: string) {
   }
 }
 
+// 커버아트만 별도로 로드하는 함수 (클릭한 트랙에만 필요)
+async function parseCover(filePath: string): Promise<string | null> {
+  try {
+    const metadata = await parseAudioFile(filePath, { skipCovers: false })
+    if (metadata.common.picture && metadata.common.picture.length > 0) {
+      const pic = metadata.common.picture[0]
+      return `data:${pic.format};base64,${Buffer.from(pic.data).toString('base64')}`
+    }
+    return null
+  } catch {
+    return null
+  }
+}
+
 // IPC Handlers
 ipcMain.handle('select-files', async () => {
   const result = await dialog.showOpenDialog({
@@ -128,14 +147,21 @@ ipcMain.handle('select-files', async () => {
     ]
   })
   if (result.canceled) return []
-  const tracks = await Promise.all(result.filePaths.map(parseTrack))
+  // 동시 4개씩 배치 처리
+  const tracks = await batchPromises(result.filePaths, parseTrack, 4)
   return tracks
 })
 
 ipcMain.handle('get-tracks-by-paths', async (_, filePaths: string[]) => {
   if (!filePaths || !Array.isArray(filePaths)) return []
-  const tracks = await Promise.all(filePaths.map(parseTrack))
+  // 동시 4개씩 배치 처리
+  const tracks = await batchPromises(filePaths, parseTrack, 4)
   return tracks
+})
+
+// 커버아트 개별 로드 (재생 시작 시 호출)
+ipcMain.handle('get-cover', async (_, filePath: string) => {
+  return await parseCover(filePath)
 })
 
 ipcMain.handle('select-folder', async () => {

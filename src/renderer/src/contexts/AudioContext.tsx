@@ -243,7 +243,17 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     howlRef.current = newHowl
     setHowl(newHowl)
     if (autoPlay) newHowl.play()
+
+    // 로컬 트랙 커버아트 지연 로딩 (재생 시작 후 백그라운드에서)
+    if (!track.isYouTube && !track.cover) {
+      // @ts-ignore
+      window.api.getCover(track.id).then((cover: string | null) => {
+        if (!cover) return
+        setQueue(prev => prev.map(t => t.id === track.id ? { ...t, cover } : t))
+      })
+    }
   }
+
 
   const handleTrackEnd = () => {
     setIsPlaying(false)
