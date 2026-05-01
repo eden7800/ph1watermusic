@@ -6,7 +6,16 @@ import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import chokidar from 'chokidar'
 import { create } from 'youtube-dl-exec'
 import { Client } from '@xhayper/discord-rpc'
-import { parseFile as parseAudioFile } from 'music-metadata'
+
+// ESM 전용 패키지 — 최초 1회만 dynamic import 후 캐싱
+let _parseFile: ((path: string, opts?: any) => Promise<any>) | null = null
+async function getParseFile() {
+  if (!_parseFile) {
+    const mod = await import('music-metadata')
+    _parseFile = mod.parseFile
+  }
+  return _parseFile
+}
 
 const binName = process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp'
 const ytDlpPath = is.dev
@@ -97,9 +106,10 @@ async function batchPromises<T>(items: string[], fn: (item: string) => Promise<T
 
 async function parseTrack(filePath: string) {
   try {
+    const parseFile = await getParseFile()
     const stats = statSync(filePath)
     // skipCovers: true → 커버아트 제외하고 메타데이터만 빠르게 읽음
-    const metadata = await parseAudioFile(filePath, { skipCovers: true })
+    const metadata = await parseFile(filePath, { skipCovers: true })
     const url = pathToFileURL(filePath).href
 
     return {
@@ -127,7 +137,8 @@ async function parseTrack(filePath: string) {
 // 커버아트만 별도로 로드하는 함수 (클릭한 트랙에만 필요)
 async function parseCover(filePath: string): Promise<string | null> {
   try {
-    const metadata = await parseAudioFile(filePath, { skipCovers: false })
+    const parseFile = await getParseFile()
+    const metadata = await parseFile(filePath, { skipCovers: false })
     if (metadata.common.picture && metadata.common.picture.length > 0) {
       const pic = metadata.common.picture[0]
       return `data:${pic.format};base64,${Buffer.from(pic.data).toString('base64')}`
