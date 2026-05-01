@@ -9289,8 +9289,8 @@ const AudioProvider = ({ children }) => {
   }, [queue, playCounts]);
   const tracksAddedIn2026 = reactExports.useMemo(() => {
     const start2026 = (/* @__PURE__ */ new Date("2026-01-01")).getTime();
-    const end2026 = (/* @__PURE__ */ new Date("2026-12-31")).getTime();
-    return queue.filter((t2) => t2.addedAt && t2.addedAt >= start2026 && t2.addedAt <= end2026);
+    const end2026 = (/* @__PURE__ */ new Date("2027-01-01")).getTime();
+    return queue.filter((t2) => t2.addedAt && t2.addedAt >= start2026 && t2.addedAt < end2026);
   }, [queue]);
   const selectAndWatchFolder = async () => {
     const folder = await window.api.selectFolder();
@@ -9422,10 +9422,13 @@ const AudioProvider = ({ children }) => {
     _prepareHowl(queue[nextIdx], true);
   };
   const playPrev = () => {
-    if (currentIndex - 1 >= 0) {
+    if (currentIndex > 0) {
       setCurrentIndex(currentIndex - 1);
       _prepareHowl(queue[currentIndex - 1], true);
-    } else if (howlRef.current) seek(0);
+    } else {
+      if (howlRef.current) seek(0);
+      else if (currentTrack) _prepareHowl(currentTrack, true);
+    }
   };
   const toggleRepeatMode = () => setRepeatMode((p2) => p2 === "off" ? "all" : p2 === "all" ? "one" : "off");
   const toggleShuffle = () => {
@@ -9508,7 +9511,7 @@ const AudioProvider = ({ children }) => {
   };
   reactExports.useEffect(() => {
     if (howlRef.current) howlRef.current.volume(volume);
-  }, [volume, howl]);
+  }, [volume]);
   reactExports.useEffect(() => {
     if (!currentTrack) {
       window.api?.discordClearPresence?.();
@@ -17824,7 +17827,7 @@ const MainLayout = () => {
     const tracks = await window.api.selectFiles();
     if (tracks && tracks.length > 0) addTracksToQueue(tracks);
   };
-  const isPlaylistUrl = (url) => /youtube\.com\/playlist\?/.test(url) || /youtu\.be\/playlist/.test(url);
+  const isPlaylistUrl = (url) => /youtube\.com\/playlist\?/.test(url) || /youtube\.com\/watch/.test(url) && /[?&]list=/.test(url) || /youtu\.be\/.+\?.*list=/.test(url);
   const handleYtSearch = async (e) => {
     if (e) e.preventDefault();
     if (!ytSearchQuery.trim()) return;
