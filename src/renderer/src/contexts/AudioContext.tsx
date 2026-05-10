@@ -78,33 +78,32 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const queueRef = useRef(queue)
   const currentIndexRef = useRef(currentIndex)
   const repeatModeRef = useRef(repeatMode)
-  const isLoadingRef = useRef(false) // YouTube 스트림 로딩 중 중복 요청 차단용
-  const howlRef = useRef<Howl | null>(null)     // 항상 최신 Howl 인스턴스 참조
-  const loadingTrackIdRef = useRef<string | null>(null) // 현재 로딩 중인 트랙 ID
+  const isLoadingRef = useRef(false)
+  const howlRef = useRef<Howl | null>(null)
+  const loadingTrackIdRef = useRef<string | null>(null)
   
   useEffect(() => { queueRef.current = queue }, [queue])
   useEffect(() => { currentIndexRef.current = currentIndex }, [currentIndex])
   useEffect(() => { repeatModeRef.current = repeatMode }, [repeatMode])
 
-  // Load state and stats
   useEffect(() => {
     const init = async () => {
       const savedState = localStorage.getItem(STORAGE_KEY)
       const savedStats = localStorage.getItem(STATS_KEY)
       
       if (savedStats) {
-        try { setPlayCounts(JSON.parse(savedStats)) } catch(e) {}
+        try { setPlayCounts(JSON.parse(savedStats)) } catch {}
       }
 
       if (savedState) {
         try {
           const state = JSON.parse(savedState)
-          const paths = (state.queuePaths || []).filter(p => !p.startsWith('http'))
+          const paths = (state.queuePaths || []).filter((p: string) => !p.startsWith('http'))
           const ytTracks = state.youtubeQueue || []
           
           let restoredQueue: Track[] = []
           if (paths.length > 0) {
-            restoredQueue = await window.api.getTracksByPaths(paths)
+            restoredQueue = await (window as any).api.getTracksByPaths(paths)
           }
           
           const fullQueue = [...restoredQueue, ...ytTracks]
@@ -123,7 +122,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           if (state.isShuffle !== undefined) setIsShuffle(state.isShuffle)
           if (state.watchedFolder) {
             setWatchedFolder(state.watchedFolder)
-            window.api.watchFolder(state.watchedFolder)
+            ;(window as any).api.watchFolder(state.watchedFolder)
           }
         } catch (e) {
           console.error('[AudioProvider] Init Error:', e)
@@ -134,17 +133,14 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     init()
   }, [])
 
-  // Folder Watching Listener
   useEffect(() => {
-    const cleanup = window.api.onFolderUpdated((newTracks) => {
-      // Keep YouTube tracks, update local tracks
+    const cleanup = (window as any).api.onFolderUpdated((newTracks: Track[]) => {
       setQueue(prev => [...newTracks, ...prev.filter(t => t.isYouTube)])
       setOriginalQueue(prev => [...newTracks, ...prev.filter(t => t.isYouTube)])
     })
     return cleanup
   }, [])
 
-  // Save state
   useEffect(() => {
     if (!isLoaded) return
     const state = {
@@ -159,8 +155,6 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
     localStorage.setItem(STATS_KEY, JSON.stringify(playCounts))
   }, [queue, currentIndex, volume, repeatMode, isShuffle, isLoaded, watchedFolder, playCounts])
-
-  // Smart Playlists
   const mostPlayed = useMemo(() => {
     return [...queue]
       .sort((a, b) => (playCounts[b.id] || 0) - (playCounts[a.id] || 0))
@@ -171,15 +165,15 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const tracksAddedIn2026 = useMemo(() => {
     const start2026 = new Date('2026-01-01').getTime()
-    const end2026 = new Date('2027-01-01').getTime() // 2026년 12월 31일 전체 포함
+    const end2026 = new Date('2027-01-01').getTime()
     return queue.filter(t => t.addedAt && t.addedAt >= start2026 && t.addedAt < end2026)
   }, [queue])
 
   const selectAndWatchFolder = async () => {
-    const folder = await window.api.selectFolder()
+    const folder = await (window as any).api.selectFolder()
     if (folder) {
       setWatchedFolder(folder)
-      window.api.watchFolder(folder)
+      ;(window as any).api.watchFolder(folder)
     }
   }
 
@@ -191,12 +185,10 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }
 
   const _prepareHowl = async (track: Track, autoPlay: boolean = false) => {
-    // 같은 트랙을 이미 로딩 중이면 중복 차단 (다른 트랙 요청은 통과)
     if (track.isYouTube && isLoadingRef.current && loadingTrackIdRef.current === track.id) return
 
-    // 이전 Howl 즉시 정지 (ref 사용으로 항상 최신 인스턴스 접근)
     if (howlRef.current) {
-      howlRef.current.off() // 이벤트 핸들러 제거 (onend 재발화 방지)
+      howlRef.current.off()
       howlRef.current.stop()
       howlRef.current.unload()
       howlRef.current = null
@@ -210,19 +202,14 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     let finalUrl = track.url
     if (track.isYouTube) {
-      const streamUrl = await window.api.youtubeGetStream(track.id)
+      const streamUrl = await (window as any).api.youtubeGetStream(track.id)
       isLoadingRef.current = false
       loadingTrackIdRef.current = null
 
-      // 로딩 완료 전에 다른 트랙으로 이미 변경됐으면 무시
       if (streamUrl) finalUrl = streamUrl
-      else {
-        console.error('Failed to get YouTube stream')
-        return
-      }
+      else return
     }
 
-    // 로딩 완료 시점에 다른 track이 이미 ref에 있으면 중단
     if (howlRef.current !== null) return
 
     const newHowl = new Howl({
@@ -240,16 +227,14 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       onstop: () => setIsPlaying(false),
       onend: () => handleTrackEnd()
     })
+    
     howlRef.current = newHowl
     setHowl(newHowl)
     if (autoPlay) newHowl.play()
 
-    // 로컬 트랙 커버아트 지연 로딩 (재생 시작 후 백그라운드에서)
     if (!track.isYouTube && !track.cover) {
-      // @ts-ignore
-      window.api.getCover(track.id).then((cover: string | null) => {
-        if (!cover) return
-        setQueue(prev => prev.map(t => t.id === track.id ? { ...t, cover } : t))
+      ;(window as any).api.getCover(track.id).then((cover: string | null) => {
+        if (cover) setQueue(prev => prev.map(t => t.id === track.id ? { ...t, cover } : t))
       })
     }
   }
@@ -274,33 +259,28 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   }
 
-  // Audio Sync Effect
   useEffect(() => {
-    if (howl) {
-      const interval = setInterval(() => {
-        if (isPlaying) setCurrentTime(howl.seek() as number)
-      }, 100)
-      return () => clearInterval(interval)
-    }
+    if (!howl) return
+    const interval = setInterval(() => {
+      if (isPlaying) setCurrentTime(howl.seek() as number)
+    }, 100)
+    return () => clearInterval(interval)
   }, [howl, isPlaying])
 
   const playQueue = (tracks: Track[], startIndex: number = 0) => {
-    if (tracks.length === 0) return
+    if (!tracks.length) return
     setQueue(tracks)
     if (!isShuffle) setOriginalQueue([...tracks])
     setCurrentIndex(startIndex)
     _prepareHowl(tracks[startIndex], true)
   }
 
-  // 기존 큐에 새 로컬 트랙 추가 (중복 제거, 현재 재생 곡 유지)
   const addTracksToQueue = (newTracks: Track[]) => {
-    if (newTracks.length === 0) return
+    if (!newTracks.length) return
 
-    // 현재 재생 중인 트랙 ID 기억 (큐 재정렬 후 인덱스 복원용)
     const currentTrackId = currentIndex >= 0 ? queueRef.current[currentIndex]?.id : null
-
     const deduped = newTracks.filter(t => !queueRef.current.find(p => p.id === t.id))
-    if (deduped.length === 0) return
+    if (!deduped.length) return
 
     const localTracks = queueRef.current.filter(t => !t.isYouTube)
     const ytTracks = queueRef.current.filter(t => t.isYouTube)
@@ -310,25 +290,21 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setOriginalQueue(updated)
 
     if (currentTrackId) {
-      // 현재 재생 곡의 새 인덱스로 업데이트 (재생 중인 곡 변경 없음)
       const newIdx = updated.findIndex(t => t.id === currentTrackId)
       if (newIdx !== -1) setCurrentIndex(newIdx)
-    } else if (currentIndex === -1 && deduped.length > 0) {
-      // 아무것도 재생 안 하고 있으면 첫 번째 새 트랙 재생
+    } else if (currentIndex === -1 && deduped.length) {
       setCurrentIndex(0)
       _prepareHowl(deduped[0], true)
     }
   }
 
   const play = (track: Track) => {
-    // If track is not in current queue, prepend it
     const existingIdx = queue.findIndex(t => t.id === track.id)
     if (existingIdx !== -1) {
       setCurrentIndex(existingIdx)
       _prepareHowl(queue[existingIdx], true)
     } else {
-      const newQueue = [track, ...queue]
-      setQueue(newQueue)
+      setQueue([track, ...queue])
       setOriginalQueue([track, ...originalQueue])
       setCurrentIndex(0)
       _prepareHowl(track, true)
@@ -344,17 +320,19 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setCurrentIndex(nextIdx)
     _prepareHowl(queue[nextIdx], true)
   }
+
   const playPrev = () => {
     if (currentIndex > 0) {
       setCurrentIndex(currentIndex - 1)
       _prepareHowl(queue[currentIndex - 1], true)
     } else {
-      // 첫 번째 곡이거나 재생 중이면 처음부터 다시
       if (howlRef.current) seek(0)
       else if (currentTrack) _prepareHowl(currentTrack, true)
     }
   }
+
   const toggleRepeatMode = () => setRepeatMode(p => (p === 'off' ? 'all' : p === 'all' ? 'one' : 'off'))
+  
   const toggleShuffle = () => {
     if (!isShuffle) {
       const current = currentTrack
@@ -414,7 +392,6 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }
   const seek = (pos: number) => { setCurrentTime(pos); howlRef.current?.seek(pos) }
 
-  // 재생목록 전체 삭제
   const clearQueue = () => {
     if (howlRef.current) {
       howlRef.current.off()
@@ -434,15 +411,13 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   useEffect(() => { if (howlRef.current) howlRef.current.volume(volume) }, [volume])
 
-  // Discord RPC 자동 업데이트
   useEffect(() => {
+    const api = (window as any).api
     if (!currentTrack) {
-      // @ts-ignore
-      window.api?.discordClearPresence?.()
+      api?.discordClearPresence?.()
       return
     }
-    // @ts-ignore
-    window.api?.discordUpdatePresence?.({
+    api?.discordUpdatePresence?.({
       title: currentTrack.title,
       artist: currentTrack.artist,
       album: currentTrack.album,

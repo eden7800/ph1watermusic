@@ -36,7 +36,6 @@ const parseVTT = (vtt: string): VttLine[] => {
   let i = 0
   while (i < lines.length) {
     const line = lines[i].trim()
-    // HH:MM:SS.mmm --> HH:MM:SS.mmm 또는 MM:SS.mmm --> MM:SS.mmm
     const t = line.match(/(?:(\d{2}):)?(\d{2}):(\d{2})\.(\d{3}) --> (?:(\d{2}):)?(\d{2}):(\d{2})\.(\d{3})/)
     if (t) {
       const toSec = (h: string|undefined, m: string, s: string, ms: string) =>
@@ -51,7 +50,7 @@ const parseVTT = (vtt: string): VttLine[] => {
         i++
       }
       if (textLines.length > 0) {
-        const text = [...new Set(textLines)].join(' ') // 중복 제거
+        const text = [...new Set(textLines)].join(' ')
         if (result.length === 0 || result[result.length - 1].text !== text) {
           result.push({ start, end, text })
         }
@@ -83,7 +82,6 @@ const MainLayout: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'lyrics'|'playlist'>('lyrics')
   const [currentView, setCurrentView] = useState<'home' | 'most-played' | 'added-2026' | 'youtube'>('home')
 
-  // YouTube Search States
   const [ytSearchQuery, setYtSearchQuery] = useState('')
   const [ytSearchResults, setYtSearchResults] = useState<any[]>([])
   const [isYtSearching, setIsYtSearching] = useState(false)
@@ -98,7 +96,6 @@ const MainLayout: React.FC = () => {
   const [ytSubtitles, setYtSubtitles] = useState<VttLine[]>([])
   const [isSubLoading, setIsSubLoading] = useState(false)
 
-  // 가사 업데이트 (로컬 + YouTube 공통 — lrclib 결과 우선 적용)
   useEffect(() => {
     if (lyrics?.syncedLyrics) {
       setParsedLrc(parseLRC(lyrics.syncedLyrics))
@@ -107,29 +104,25 @@ const MainLayout: React.FC = () => {
     }
   }, [lyrics])
 
-  // YouTube 자막: lrclib 없을 때만 YouTube 자막으로 폴백
   useEffect(() => {
     if (!currentTrack?.isYouTube) {
       setYtSubtitles([])
       return
     }
-    // lrclib이 이미 로딩 중이면 잠깐 대기 후 체크
+    
     let cancelled = false
     setYtSubtitles([])
 
     const tryFetchVtt = async () => {
-      // lrclib 결과가 있으면 VTT 불필요
       if (lyrics?.syncedLyrics) return
 
       setIsSubLoading(true)
-      // @ts-ignore
-      const vtt = await window.api.youtubeGetSubtitles(currentTrack.id)
+      const vtt = await (window as any).api.youtubeGetSubtitles(currentTrack.id)
       if (cancelled) return
       setIsSubLoading(false)
       if (vtt) setYtSubtitles(parseVTT(vtt))
     }
 
-    // lrclib 응답 대기 (최대 3초)
     const timer = setTimeout(tryFetchVtt, 1500)
     return () => { cancelled = true; clearTimeout(timer) }
   }, [currentTrack?.id, lyrics?.syncedLyrics])
@@ -160,9 +153,8 @@ const MainLayout: React.FC = () => {
   }, [currentTrack])
 
   const handleSelectFiles = async () => {
-    // @ts-ignore
-    const tracks = await window.api.selectFiles()
-    if (tracks && tracks.length > 0) addTracksToQueue(tracks) // 기존 큐에 추가
+    const tracks = await (window as any).api.selectFiles()
+    if (tracks && tracks.length > 0) addTracksToQueue(tracks)
   }
 
   const isPlaylistUrl = (url: string) =>
@@ -174,16 +166,14 @@ const MainLayout: React.FC = () => {
     if (e) e.preventDefault()
     if (!ytSearchQuery.trim()) return
 
-    // 플레이리스트 URL이면 자동으로 임포트
     if (isPlaylistUrl(ytSearchQuery)) {
       handlePlaylistImport(ytSearchQuery)
       return
     }
 
     setIsYtSearching(true)
-    setCurrentView('youtube') // 결과 보이도록 YouTube 탭으로 자동 전환
-    // @ts-ignore
-    const results = await window.api.youtubeSearch(ytSearchQuery)
+    setCurrentView('youtube')
+    const results = await (window as any).api.youtubeSearch(ytSearchQuery)
     setYtSearchResults(results)
     setIsYtSearching(false)
   }
@@ -194,10 +184,9 @@ const MainLayout: React.FC = () => {
     setIsPlaylistLoading(true)
     setPlaylistPreview(null)
     setCurrentView('youtube')
-    // @ts-ignore
-    const tracks = await window.api.youtubeGetPlaylist(targetUrl)
+    
+    const tracks = await (window as any).api.youtubeGetPlaylist(targetUrl)
     if (tracks && tracks.length > 0) {
-      // 중복 제거 후 큐에 추가
       const newTracks = tracks.filter((t: any) => !youtubeQueue.find((q: any) => q.id === t.id))
       setYoutubeQueue(prev => [...prev, ...newTracks])
       setPlaylistPreview({ title: `플레이리스트`, count: tracks.length })
@@ -208,7 +197,6 @@ const MainLayout: React.FC = () => {
 
   const handlePlayYt = (track: any) => {
     play(track)
-    // Add to youtubeQueue if not already there
     if (!youtubeQueue.find(t => t.id === track.id)) {
       setYoutubeQueue([track, ...youtubeQueue])
     }
@@ -226,7 +214,6 @@ const MainLayout: React.FC = () => {
     isPlaying ? pause() : resume()
   }
 
-  // 로컬 트랙 필터링
   const getLocalTracks = () => {
     const base = currentView === 'most-played' ? mostPlayed :
                  currentView === 'added-2026' ? tracksAddedIn2026 : queue
@@ -260,7 +247,6 @@ const MainLayout: React.FC = () => {
         
         <div className="flex-1 flex justify-center max-w-2xl px-4 no-drag">
           {currentView === 'youtube' ? (
-            // YouTube 검색창 (검색어 or 플레이리스트 URL)
             <form onSubmit={handleYtSearch} className="w-full max-w-xl bg-white/10 rounded-lg flex items-center px-4 py-2 border border-white/5 focus-within:bg-white/20 transition-colors">
               {isPlaylistUrl(ytSearchQuery)
                 ? <ListVideo size={18} className="text-[#fa243c] mr-3 shrink-0" />
@@ -281,7 +267,6 @@ const MainLayout: React.FC = () => {
               }
             </form>
           ) : (
-            // 로컬 검색창
             <div className="w-full max-w-xl bg-white/10 rounded-lg flex items-center px-4 py-2 border border-white/5 focus-within:bg-white/20 transition-colors">
               <Search size={20} className="text-white/50 mr-3 shrink-0" />
               <input 
@@ -378,7 +363,6 @@ const MainLayout: React.FC = () => {
             </div>
           </div>
 
-          {/* 플레이리스트 로딩 중 배너 */}
           {currentView === 'youtube' && isPlaylistLoading && (
             <div className="mb-6 relative z-10 flex items-center gap-3 px-4 py-3 rounded-xl bg-white/5 border border-white/10">
               <Loader2 size={18} className="animate-spin text-[#fa243c] shrink-0" />
@@ -386,7 +370,6 @@ const MainLayout: React.FC = () => {
             </div>
           )}
 
-          {/* 플레이리스트 완료 토스트 */}
           {currentView === 'youtube' && playlistPreview && !isPlaylistLoading && (
             <div className="mb-6 relative z-10 flex items-center justify-between px-4 py-3 rounded-xl bg-[#fa243c]/10 border border-[#fa243c]/20">
               <div className="flex items-center gap-3">
@@ -541,7 +524,6 @@ const MainLayout: React.FC = () => {
                     <div className="flex-1 overflow-y-auto pr-4 lg:pr-10 custom-scrollbar scroll-smooth" ref={lyricsContainerRef}>
                        <div className="space-y-6 lg:space-y-8 pb-40 lg:pb-60 text-center lg:text-left">
                          {currentTrack?.isYouTube && parsedLrc.length > 0 ? (
-                           // YouTube 트랙 + lrclib 가사 있음 → LRC 표시
                            parsedLrc.map((line, idx) => (
                              <p key={idx}
                                className={`font-black transition-all duration-700 cursor-pointer leading-[1.3] lg:origin-left ${
@@ -555,7 +537,6 @@ const MainLayout: React.FC = () => {
                              </p>
                            ))
                          ) : currentTrack?.isYouTube ? (
-                           // YouTube 트랙 + lrclib 없음 → YouTube 자막
                            ytSubtitles.length > 0 ? ytSubtitles.map((line, idx) => {
                              const isActive = currentTime >= line.start && currentTime < line.end
                              return (
